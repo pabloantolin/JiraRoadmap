@@ -117,6 +117,7 @@ export default function Swimlane() {
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [dragOverField, setDragOverField] = useState<string | null>(null);
   const [cardPreviewHeight, setCardPreviewHeight] = useState(60);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   // Actualizar altura del preview cuando cambian los campos
   useEffect(() => {
@@ -142,6 +143,7 @@ export default function Swimlane() {
   
   const handleDrop = (e: React.DragEvent, field: string) => {
     e.preventDefault();
+    setHasUnsavedChanges(true);
     if (draggedField && draggedField !== field) {
       const newOrder = [...fieldOrder];
       const draggedIndex = newOrder.indexOf(draggedField);
@@ -159,6 +161,7 @@ export default function Swimlane() {
   
   // Función para cambiar la posición horizontal de un campo
   const updateFieldPosition = (field: string, position: 'left' | 'center' | 'right') => {
+    setHasUnsavedChanges(true);
     setFieldPositions(prev => ({
       ...prev,
       [field]: position
@@ -167,6 +170,7 @@ export default function Swimlane() {
   
   // Función para activar un campo (agregar al final del orden)
   const activateField = (field: string) => {
+    setHasUnsavedChanges(true);
     setCardFields(prev => ({
       ...prev,
       [field]: true
@@ -183,6 +187,7 @@ export default function Swimlane() {
   
   // Función para desactivar un campo (eliminar del orden)
   const deactivateField = (field: string) => {
+    setHasUnsavedChanges(true);
     setCardFields(prev => ({
       ...prev,
       [field]: false
@@ -192,6 +197,20 @@ export default function Swimlane() {
     setFieldOrder(prev => prev.filter(f => f !== field));
   };
   
+  // Función para guardar los cambios del Card Preview
+  const saveCardPreviewChanges = () => {
+    setHasUnsavedChanges(false);
+    // Forzar recálculo del canvas
+    const newBlocks = processEpicsIntoBlocks(epics, initiativeRelations);
+    setBlocks(newBlocks);
+  };
+
+  // Función para descartar cambios
+  const discardCardPreviewChanges = () => {
+    setHasUnsavedChanges(false);
+    // Aquí podrías revertir a los valores guardados anteriormente
+  };
+
   const [featureTypes, setFeatureTypes] = useState<{id: string, value: string, name: string}[]>([]);
   const [selectedFeatureTypes, setSelectedFeatureTypes] = useState<string[]>([]);
   const [obReaches, setObReaches] = useState<{id: string, value: string, name: string}[]>([]);
@@ -890,8 +909,8 @@ export default function Swimlane() {
       let currentY = 20 + headerHeight; // Posición Y inicial para esta columna
       
       releaseEpics.forEach((epic, epicIndex) => {
-        // Calcular altura para esta card específica según sus datos reales
-        const cardHeight = calculateCardHeight(); // Usar altura homogénea para todas las cards
+        // Calcular altura para esta card específica según los campos visibles (igual que Card Preview)
+        const cardHeight = calculateCardHeight();
         
         console.log(`📍 Posicionando ${epic.key}:`, {
           epicIndex,
@@ -997,34 +1016,34 @@ export default function Swimlane() {
     let height = 0;
     
     // Altura base para padding y bordes
-    height += 16; // padding general
+    height += 20; // Aumentado padding base
     
     // Altura según campos visibles
     if (cardFields.title) {
-      height += 30; // altura para título (2 líneas posibles)
+      height += 35; // altura para título (aumentado para 2 líneas)
     }
     
     if (cardFields.shortDescription) {
-      height += 20; // altura para descripción (2 líneas posibles)
+      height += 30; // altura para descripción (aumentado para 2-3 líneas)
     }
     
     if (cardFields.image) {
-      height += 40; // altura para imagen (40px)
+      height += 50; // altura para imagen (aumentado)
     }
     
     if (cardFields.labels) {
-      height += 20; // altura para labels (1 línea)
+      height += 25; // altura para labels (aumentado para múltiples labels)
     }
     
     if (cardFields.obReach) {
-      height += 24; // altura para logo OB Reach (24px)
+      height += 30; // altura para logo OB Reach (aumentado)
     }
     
-    // Espaciado entre campos (4px = mb-1)
+    // Espaciado entre campos (6px = mb-1.5)
     const visibleFieldsCount = Object.values(cardFields).filter(Boolean).length;
-    height += (visibleFieldsCount - 1) * 4; // 4px entre campos
+    height += (visibleFieldsCount - 1) * 6; // 6px entre campos
     
-    return Math.max(60, height); // mínimo 60px
+    return Math.max(80, height); // mínimo aumentado a 80px
   };
 
   // Función para calcular la altura de una card específica basada en sus datos reales
@@ -1199,18 +1218,6 @@ export default function Swimlane() {
         
         // Procesar relaciones de initiatives
         setInitiativeRelations(data.initiativeRelations || []);
-        
-        console.log('🔥 ANTES DEL setTimeout - initiativeRelations:', data.initiativeRelations?.length || 0);
-        
-        // Forzar actualización después de cargar datos para asegurar que el useEffect se dispare
-        setTimeout(() => {
-          console.log('🔄🔄🔄 setTimeout EJECUTADO - Forzando actualización de useEffect');
-          setForceUpdate(prev => {
-            console.log('🔄🔄🔄 forceUpdate incrementado de', prev, 'a', prev + 1);
-            return prev + 1;
-          });
-        }, 100);
-        
         setLoading(false);
       })
       .catch(e => {
@@ -1218,6 +1225,14 @@ export default function Swimlane() {
         setLoading(false);
       });
   }, [selectedFixVersions, selectedInitiatives, selectedThemes, selectedDevices, selectedFeatureTypes, selectedObReaches, selectedSponsors, selectedStatuses, selectedAssignees, selectedLabels]);
+
+  // Efecto inicial para pintar el canvas con configuración por defecto
+  useEffect(() => {
+    if (epics.length > 0 && initiativeRelations.length > 0) {
+      const newBlocks = processEpicsIntoBlocks(epics, initiativeRelations);
+      setBlocks(newBlocks);
+    }
+  }, [epics, initiativeRelations]); // Solo al cargar datos iniciales
 
   useEffect(() => {
     console.log('🔄 useEffect de blocks ejecutándose:', { 
@@ -1252,7 +1267,7 @@ export default function Swimlane() {
       prevEpicsRef.current = [...epics];
       prevInitiativeRelationsRef.current = [...initiativeRelations];
     }
-  }, [epics, initiativeRelations, forceUpdate]);
+  }, [epics, initiativeRelations, hasUnsavedChanges]); // Solo se dispara al guardar cambios
 
   // Debug: Verificar cambios en epics
   useEffect(() => {
@@ -2112,7 +2127,7 @@ export default function Swimlane() {
           ));
         })()}
         
-        {blocks.map(block => (
+        {blocks.map((block, index) => (
           <div
             key={block.id}
             data-epic-id={block.id}
@@ -2125,7 +2140,7 @@ export default function Swimlane() {
               left: `${block.x}px`,
               top: `${block.y}px`,
               width: `${block.width}px`,
-              height: `${block.height}px` // Usar altura real calculada para cada epic
+              height: `${calculateCardHeight()}px` // Usar altura dinámica actual
             }}
             onClick={() => setSelectedEpic(selectedEpic === block.id ? null : block.id)}
           >
@@ -2483,7 +2498,10 @@ export default function Swimlane() {
                 Cancel
               </button>
               <button
-                onClick={() => setShowCustomizeCard(false)}
+                onClick={() => {
+                  saveCardPreviewChanges();
+                  setShowCustomizeCard(false);
+                }}
                 className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
                 Apply Changes
