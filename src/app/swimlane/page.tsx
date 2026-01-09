@@ -891,7 +891,7 @@ export default function Swimlane() {
       
       releaseEpics.forEach((epic, epicIndex) => {
         // Calcular altura para esta card específica según sus datos reales
-        const cardHeight = calculateEpicCardHeight(epic);
+        const cardHeight = calculateCardHeight(); // Usar altura homogénea para todas las cards
         
         console.log(`📍 Posicionando ${epic.key}:`, {
           epicIndex,
@@ -2125,7 +2125,7 @@ export default function Swimlane() {
               left: `${block.x}px`,
               top: `${block.y}px`,
               width: `${block.width}px`,
-              height: `${calculateCardHeight()}px` // Usar altura dinámica
+              height: `${block.height}px` // Usar altura real calculada para cada epic
             }}
             onClick={() => setSelectedEpic(selectedEpic === block.id ? null : block.id)}
           >
